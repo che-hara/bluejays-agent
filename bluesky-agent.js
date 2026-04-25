@@ -140,15 +140,13 @@ async function findBlueJaysGameToday() {
 }
 
 async function getGameLiveData(gameId) {
-  const res = await fetch(`https://statsapi.mlb.com/api/v1/game/${gameId}`);
+  const res = await fetch(`https://statsapi.mlb.com/api/v1.1/game/${gameId}/feed/live`);
   const data = await res.json();
   return data.gameData && data.liveData ? data : null;
 }
 
-async function getGamePlayByPlay(gameId) {
-  const res = await fetch(`https://statsapi.mlb.com/api/v1/game/${gameId}/playByPlay`);
-  const data = await res.json();
-  return data.allPlays || [];
+function extractPlays(gameData) {
+  return gameData.liveData?.plays?.allPlays || [];
 }
 
 // ============================================================================
@@ -670,7 +668,7 @@ async function poll() {
       return;
     }
 
-    const plays = await getGamePlayByPlay(gameId);
+    const plays = extractPlays(gameData);
     const gs = parseGameState(gameData, plays);
     state.gameState = gs;
 

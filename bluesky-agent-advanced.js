@@ -108,14 +108,14 @@ async function findBlueJaysGameToday() {
 
 async function getGamePlayByPlay(gameId) {
   const response = await fetch(
-    `https://statsapi.mlb.com/api/v1/game/${gameId}/playByPlay`
+    `https://statsapi.mlb.com/api/v1.1/game/${gameId}/feed/live`
   );
   const data = await response.json();
-  return data.allPlays || [];
+  return data.liveData?.plays?.allPlays || [];
 }
 
 async function getGameLiveData(gameId) {
-  const response = await fetch(`https://statsapi.mlb.com/api/v1/game/${gameId}`);
+  const response = await fetch(`https://statsapi.mlb.com/api/v1.1/game/${gameId}/feed/live`);
   const data = await response.json();
   return data.gameData && data.liveData ? data : null;
 }
