@@ -107,9 +107,11 @@ async function postToBluesky(text) {
 }
 
 async function fetchFanSentiment() {
+  if (!blueskySession) return [];
   try {
     const res = await fetch(
-      "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=%23BlueJays&limit=8"
+      "https://bsky.social/xrpc/app.bsky.feed.searchPosts?q=Blue+Jays&limit=15&sort=latest",
+      { headers: { Authorization: `Bearer ${blueskySession.accessJwt}` } }
     );
     if (!res.ok) return [];
     const data = await res.json();
