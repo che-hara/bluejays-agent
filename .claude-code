@@ -1,0 +1,161 @@
+{
+  "projectName": "Blue Jays Bluesky Agent",
+  "projectDescription": "AI-powered fan reaction agent that posts authentic Blue Jays fan commentary to Bluesky during live games",
+  "version": "2.0.0",
+  "created": "2026-04-24",
+  
+  "projectDetails": {
+    "stack": ["Node.js 18.20.8", "Anthropic SDK", "Bluesky API", "MLB Stats API", "Railway"],
+    "mainFile": "bluesky-agent.js",
+    "entryPoint": "node bluesky-agent.js",
+    "port": 3000,
+    "dashboard": "http://localhost:3000"
+  },
+
+  "files": {
+    "include": [
+      "bluesky-agent.js",
+      "package.json",
+      "package-lock.json",
+      "README.md",
+      "DEPLOYMENT.md"
+    ],
+    "exclude": [
+      "node_modules/",
+      ".DS_Store",
+      ".env",
+      ".env.rtf",
+      "*.pdf"
+    ]
+  },
+
+  "keyFeatures": [
+    "Live game polling with dynamic intervals (5min waiting, 1min preview, 30sec live)",
+    "Claude-powered authentic fan reaction generation",
+    "Bluesky posting with clickable hashtag facets",
+    "Web-based approval dashboard with password protection",
+    "Game flow tracking and momentum analysis",
+    "Fan sentiment detection from Bluesky posts",
+    "Play-by-play sentiment analysis"
+  ],
+
+  "environmentVariables": [
+    {
+      "name": "ANTHROPIC_API_KEY",
+      "description": "Claude API key for generating fan reactions",
+      "required": true
+    },
+    {
+      "name": "BLUESKY_USERNAME",
+      "description": "Bluesky account username",
+      "required": true
+    },
+    {
+      "name": "BLUESKY_PASSWORD",
+      "description": "Bluesky account password/app-specific password",
+      "required": true
+    },
+    {
+      "name": "DASHBOARD_PASSWORD",
+      "description": "Dashboard login password",
+      "required": false,
+      "default": "jayswin"
+    },
+    {
+      "name": "PORT",
+      "description": "Server port for dashboard",
+      "required": false,
+      "default": "3000"
+    }
+  ],
+
+  "deployment": {
+    "platform": "Railway",
+    "url": "bluejays-agent-production.up.railway.app",
+    "autoDeployFromGitHub": true,
+    "repository": "chelseybrandon/bluesky-agent",
+    "branch": "main"
+  },
+
+  "keyFunctions": {
+    "postToBluesky": "Posts text to Bluesky with hashtag facet support",
+    "generateFanReactionPost": "Uses Claude API to generate authentic fan reactions",
+    "parseGameState": "Extracts game data from MLB Stats API",
+    "analyzeMomentum": "Tracks score changes and momentum shifts",
+    "detectHashtagsAndCreateFacets": "Makes hashtags clickable on Bluesky",
+    "serveDashboard": "Runs HTTP server for approval dashboard"
+  },
+
+  "recentChanges": [
+    {
+      "date": "2026-04-24",
+      "type": "feature",
+      "description": "Added Game Vibe and What Fans Are Saying sections to dashboard"
+    },
+    {
+      "date": "2026-04-24",
+      "type": "bugfix",
+      "description": "Fixed UTF-8 encoding issues in dashboard HTML"
+    },
+    {
+      "date": "2026-04-24",
+      "type": "feature",
+      "description": "Improved dashboard UI with Bebas Neue fonts and better styling"
+    },
+    {
+      "date": "2026-04-24",
+      "type": "feature",
+      "description": "Faster polling intervals (30 sec live, 1 min preview)"
+    },
+    {
+      "date": "2026-04-24",
+      "type": "feature",
+      "description": "Clickable hashtags via Bluesky facets"
+    }
+  ],
+
+  "knownIssues": [
+    {
+      "issue": "Bluesky session token expiration",
+      "status": "resolved",
+      "solution": "Auto-refresh on 401 error before retry"
+    },
+    {
+      "issue": "Unicode character corruption in HTML templates",
+      "status": "resolved",
+      "solution": "Removed special characters, use ASCII alternatives"
+    }
+  ],
+
+  "nextSteps": [
+    "Test clickable hashtags in production during live game",
+    "Monitor Bluesky fan sentiment fetching for rate limits",
+    "Add game-specific emoji reactions to posts",
+    "Implement post scheduling for between-inning updates",
+    "Add stats tracking (posts per game, engagement metrics)"
+  ],
+
+  "testing": {
+    "localTestingUrl": "http://localhost:3000",
+    "testPassword": "jayswin",
+    "mlbApiBase": "https://statsapi.mlb.com/api/v1",
+    "blueskyApiBase": "https://bsky.social/xrpc"
+  },
+
+  "developmentNotes": {
+    "personality": "Witty, sarcastic female Blue Jays fan from Toronto. Authentic, Canadian, family-friendly.",
+    "postStyle": "1-2 sentences max, under 150 characters. Use city names not team nicknames.",
+    "pollStrategy": "Dynamic intervals based on game status: waiting (5min) > preview (1min) > live (30sec) > final (5min)",
+    "dashboardRefresh": "Client polls /api/state every 5 seconds for real-time updates"
+  },
+
+  "gitignore": [
+    "node_modules/",
+    ".env",
+    ".env.local",
+    "*.log",
+    ".DS_Store",
+    "dist/",
+    "build/"
+  ]
+}
