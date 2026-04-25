@@ -136,7 +136,7 @@ async function analyzeSentimentFromPlays(plays) {
   };
 
   for (const play of plays.slice(-20)) {
-    const desc = play.result.description.toLowerCase();
+    const desc = (play.result?.description || "").toLowerCase();
 
     if (desc.includes("home run")) playTypes.homeRuns++;
     if (desc.includes("single") || desc.includes("double") || desc.includes("triple"))
@@ -276,8 +276,8 @@ function parseGameState(gameData, playByPlayData) {
     .slice(-3)
     .reverse() // Most recent first
     .map((play) => {
-      const description = play.result.description;
-      const player = play.player?.person?.fullName || "Unknown";
+      const description = play.result?.description || "";
+      const player = play.matchup?.batter?.fullName || play.player?.person?.fullName || "Unknown";
       return `${player}: ${description}`;
     });
 
@@ -309,7 +309,7 @@ async function runBlueJaysAgent() {
       return;
     }
 
-    const gameId = game.gameId || game.id;
+    const gameId = game.gamePk || game.id;
     console.log(
       `✓ Found game: ${game.teams.away.team.name} @ ${game.teams.home.team.name}`
     );
