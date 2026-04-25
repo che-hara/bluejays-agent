@@ -36,6 +36,7 @@ const state = {
   fanSentiment: [],
   postCount: 0,
   lastPlayIndex: 0,
+  lastInningPosted: 0,
   lastUpdated: null,
   error: null,
 };
@@ -501,6 +502,22 @@ function renderDashboard() {
     }
     .full-width { grid-column: 1 / -1; }
 
+    @media (max-width: 640px) {
+      main {
+        grid-template-columns: 1fr;
+        padding: 12px;
+        gap: 12px;
+      }
+      .full-width { grid-column: 1; }
+      header {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px 14px;
+      }
+      header h1 { font-size: 20px; }
+      .card { padding: 14px; }
+    }
+
     .card {
       background: #111827;
       border-radius: 12px;
@@ -833,16 +850,20 @@ async function poll() {
     const keyPlay = findKeyPlay(plays, state.lastPlayIndex, gs.isAway);
     state.lastPlayIndex = plays.length;
 
+    const newInning = gs.inning > state.lastInningPosted;
     const shouldQueue =
-      (momentum.momentum !== "" || joiningMidGame || keyPlay !== null) &&
+      (momentum.momentum !== "" || joiningMidGame || keyPlay !== null || newInning) &&
       !state.pendingPost &&
       state.postCount < MAX_POSTS;
 
     if (shouldQueue) {
+      state.lastInningPosted = gs.inning;
       const reason = joiningMidGame
         ? "Joining mid-game"
         : keyPlay
         ? `Key play: ${keyPlay.event}`
+        : newInning
+        ? `Inning ${gs.inning} check-in`
         : momentum.momentum;
       console.log(`${reason} — generating post...`);
       const text = await generateFanReactionPost(gs, momentum, state.fanSentiment, keyPlay);
