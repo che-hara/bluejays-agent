@@ -200,6 +200,7 @@ function parseGameState(gameData, plays) {
 
 let previousBlueJaysScore = null;
 let previousOpponentScore = null;
+let firstLivePoll = true;
 
 function analyzeMomentum(gameState) {
   let momentum = "";
@@ -231,13 +232,14 @@ async function generateFanReactionPost(gameState, momentum, fanSentiment) {
   const diff = momentum.differential;
   const situation =
     diff > 0 ? `up by ${diff}` : diff < 0 ? `down by ${Math.abs(diff)}` : "tied";
+  const isCheckIn = !momentum.momentum;
 
   const prompt = `You are a witty, sarcastic female Blue Jays fan from Toronto posting live game updates to Bluesky. Authentic, Canadian, family-friendly.
 
 GAME: Toronto vs ${gameState.opponent}
 SCORE: Toronto ${gameState.blueJaysScore} - ${gameState.opponent} ${gameState.opponentScore} (${situation})
 INNING: ${gameState.inningState} ${gameState.inning} | ${gameState.outs} out(s)
-${momentum.momentum ? `JUST HAPPENED: ${momentum.momentum}` : ""}
+${momentum.momentum ? `JUST HAPPENED: ${momentum.momentum}` : "CONTEXT: Just tuned in mid-game — write a check-in post about the current situation"}
 RECENT PLAYS:
 ${gameState.recentPlays
   .slice(0, 3)
@@ -252,7 +254,7 @@ ${
     : ""
 }
 
-Write a single Bluesky post. 1-2 sentences, under 150 characters. Use city names not team nicknames. Occasional emoji okay. No hashtags.
+Write a single Bluesky post. 1-2 sentences, under 150 characters. Use city names not team nicknames. Occasional emoji okay. No hashtags.${isCheckIn ? " Sound like you just opened the game and are catching up." : ""}
 
 Reply with ONLY the post text.`;
 
@@ -692,16 +694,23 @@ async function poll() {
     state.phase = "live";
     updateVibe(gs, plays);
 
-    if (Math.random() < 0.3) {
+    const joiningMidGame = firstLivePoll && (gs.blueJaysScore + gs.opponentScore > 0);
+    if (firstLivePoll) {
+      firstLivePoll = false;
+      state.fanSentiment = await fetchFanSentiment();
+    } else if (Math.random() < 0.3) {
       state.fanSentiment = await fetchFanSentiment();
     }
 
     const momentum = analyzeMomentum(gs);
     const shouldQueue =
-      momentum.momentum !== "" && !state.pendingPost && state.postCount < MAX_POSTS;
+      (momentum.momentum !== "" || joiningMidGame) &&
+      !state.pendingPost &&
+      state.postCount < MAX_POSTS;
 
     if (shouldQueue) {
-      console.log(`Score change: ${momentum.momentum} — generating post...`);
+      const reason = joiningMidGame ? "Joining mid-game" : momentum.momentum;
+      console.log(`${reason} — generating post...`);
       const text = await generateFanReactionPost(gs, momentum, state.fanSentiment);
       if (text) {
         state.pendingPost = { text, generatedAt: new Date().toISOString() };
