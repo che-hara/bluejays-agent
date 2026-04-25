@@ -51,9 +51,12 @@ async function blueskyLogin() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ identifier: BLUESKY_USERNAME, password: BLUESKY_PASSWORD }),
   });
-  if (!res.ok) throw new Error(`Bluesky login failed: ${res.statusText}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Bluesky login failed (${res.status}): ${body || res.statusText}`);
+  }
   blueskySession = await res.json();
-  console.log("Logged into Bluesky as", BLUESKY_USERNAME);
+  console.log("Logged into Bluesky as", blueskySession.handle || BLUESKY_USERNAME);
 }
 
 function detectHashtagsAndCreateFacets(text) {
@@ -553,11 +556,25 @@ function renderDashboard() {
       const textarea = document.getElementById("post-edit");
       const text = textarea ? textarea.value.trim() : null;
       if (text !== null && text.length === 0) return;
-      await apiFetch("/api/approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
+      const btn = document.querySelector(".btn-approve");
+      if (btn) { btn.disabled = true; btn.textContent = "Posting..."; }
+      try {
+        const r = await apiFetch("/api/approve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        if (!r.ok) {
+          const data = await r.json().catch(() => ({}));
+          alert("Post failed: " + (data.error || r.status));
+          if (btn) { btn.disabled = false; btn.textContent = "Approve + Post"; }
+          return;
+        }
+      } catch (e) {
+        alert("Network error: " + e.message);
+        if (btn) { btn.disabled = false; btn.textContent = "Approve + Post"; }
+        return;
+      }
       location.reload();
     }
 
@@ -639,6 +656,7 @@ function serveDashboard() {
             state.recentPosts.unshift({ text, postedAt: new Date().toISOString() });
             if (state.recentPosts.length > 5) state.recentPosts.pop();
             state.postCount++;
+            state.error = null;
             console.log(`Posted (${state.postCount}/${MAX_POSTS}): "${text}"`);
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: true }));
@@ -646,6 +664,7 @@ function serveDashboard() {
           .catch((err) => {
             console.error("Post failed:", err.message);
             state.pendingPost = post;
+            state.error = err.message;
             res.writeHead(500, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ error: err.message }));
           });
@@ -769,6 +788,16 @@ async function runPollLoop() {
 
 async function main() {
   console.log("Toronto Blue Jays Bluesky Agent v3.0");
+
+  // Validate Bluesky credentials at startup so failures surface immediately
+  try {
+    await blueskyLogin();
+  } catch (err) {
+    console.error("FATAL: Bluesky login failed at startup —", err.message);
+    console.error("Check BLUESKY_USERNAME and BLUESKY_PASSWORD environment variables.");
+    process.exit(1);
+  }
+
   serveDashboard();
   await runPollLoop();
 }
