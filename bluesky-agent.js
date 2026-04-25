@@ -35,6 +35,7 @@ const state = {
   vibe: "",
   fanSentiment: [],
   postCount: 0,
+  lastPlayIndex: 0,
   lastUpdated: null,
   error: null,
 };
@@ -194,6 +195,7 @@ function parseGameState(gameData, plays) {
     inningState,
     outs,
     recentPlays,
+    isAway,
   };
 }
 
@@ -228,21 +230,91 @@ function analyzeMomentum(gameState) {
 }
 
 // ============================================================================
+// KEY PLAY DETECTION
+// ============================================================================
+
+const KEY_PLAY_EVENTS = new Set([
+  "Home Run",
+  "Triple",
+  "Grounded Into Double Play",
+  "Double Play",
+  "Stolen Base 2B",
+  "Stolen Base 3B",
+  "Stolen Base Home",
+  "Field Error",
+  "Hit By Pitch",
+]);
+
+// Priority order — lower index = more exciting
+const KEY_PLAY_PRIORITY = [
+  "Home Run",
+  "Stolen Base Home",
+  "Triple",
+  "Grounded Into Double Play",
+  "Double Play",
+  "Stolen Base 3B",
+  "Stolen Base 2B",
+  "Field Error",
+  "Hit By Pitch",
+];
+
+function findKeyPlay(plays, fromIndex, isAway) {
+  const newPlays = plays.slice(fromIndex);
+  if (newPlays.length === 0) return null;
+
+  // Find all key plays in the new batch
+  const keyPlays = newPlays.filter((p) => KEY_PLAY_EVENTS.has(p.result?.event || ""));
+  if (keyPlays.length === 0) return null;
+
+  // Return the highest-priority one
+  keyPlays.sort(
+    (a, b) =>
+      KEY_PLAY_PRIORITY.indexOf(a.result.event) -
+      KEY_PLAY_PRIORITY.indexOf(b.result.event)
+  );
+  const play = keyPlays[0];
+
+  // Determine if this was a Blue Jays play
+  // Jays are away → they bat top half; Jays are home → they bat bottom half
+  const jaysAtBat = isAway ? play.about?.isTopInning : !play.about?.isTopInning;
+
+  return {
+    event: play.result.event,
+    description: play.result.description || "",
+    batter: play.matchup?.batter?.fullName || "",
+    pitcher: play.matchup?.pitcher?.fullName || "",
+    inning: play.about?.inning || "",
+    isTopInning: play.about?.isTopInning,
+    isJaysPlay: !!jaysAtBat,
+  };
+}
+
+// ============================================================================
 // CLAUDE AI POST GENERATION
 // ============================================================================
 
-async function generateFanReactionPost(gameState, momentum, fanSentiment) {
+async function generateFanReactionPost(gameState, momentum, fanSentiment, keyPlay = null) {
   const diff = momentum.differential;
   const situation =
     diff > 0 ? `up by ${diff}` : diff < 0 ? `down by ${Math.abs(diff)}` : "tied";
-  const isCheckIn = !momentum.momentum;
+  const isCheckIn = !momentum.momentum && !keyPlay;
+
+  let eventContext = "";
+  if (keyPlay) {
+    const side = keyPlay.isJaysPlay ? "TORONTO" : gameState.opponent.toUpperCase();
+    eventContext = `KEY PLAY [${side}]: ${keyPlay.description}`;
+  } else if (momentum.momentum) {
+    eventContext = `JUST HAPPENED: ${momentum.momentum}`;
+  } else {
+    eventContext = "CONTEXT: Just tuned in mid-game — write a check-in post about the current situation";
+  }
 
   const prompt = `You are a witty, sarcastic female Blue Jays fan from Toronto posting live game updates to Bluesky. Authentic, Canadian, family-friendly.
 
 GAME: Toronto vs ${gameState.opponent}
 SCORE: Toronto ${gameState.blueJaysScore} - ${gameState.opponent} ${gameState.opponentScore} (${situation})
 INNING: ${gameState.inningState} ${gameState.inning} | ${gameState.outs} out(s)
-${momentum.momentum ? `JUST HAPPENED: ${momentum.momentum}` : "CONTEXT: Just tuned in mid-game — write a check-in post about the current situation"}
+${eventContext}
 RECENT PLAYS:
 ${gameState.recentPlays
   .slice(0, 3)
@@ -758,15 +830,22 @@ async function poll() {
     }
 
     const momentum = analyzeMomentum(gs);
+    const keyPlay = findKeyPlay(plays, state.lastPlayIndex, gs.isAway);
+    state.lastPlayIndex = plays.length;
+
     const shouldQueue =
-      (momentum.momentum !== "" || joiningMidGame) &&
+      (momentum.momentum !== "" || joiningMidGame || keyPlay !== null) &&
       !state.pendingPost &&
       state.postCount < MAX_POSTS;
 
     if (shouldQueue) {
-      const reason = joiningMidGame ? "Joining mid-game" : momentum.momentum;
+      const reason = joiningMidGame
+        ? "Joining mid-game"
+        : keyPlay
+        ? `Key play: ${keyPlay.event}`
+        : momentum.momentum;
       console.log(`${reason} — generating post...`);
-      const text = await generateFanReactionPost(gs, momentum, state.fanSentiment);
+      const text = await generateFanReactionPost(gs, momentum, state.fanSentiment, keyPlay);
       if (text) {
         state.pendingPost = { text, generatedAt: new Date().toISOString() };
         console.log(`Queued for approval: "${text}"`);
