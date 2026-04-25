@@ -177,6 +177,12 @@ function parseGameState(gameData, plays) {
   const inningState = liveData.linescore.inningState || "";
   const outs = liveData.linescore.outs || 0;
   const abstractState = gameData.gameData.status.abstractGameState;
+  const offense = liveData.linescore.offense || {};
+  const runners = {
+    first:  !!offense.first,
+    second: !!offense.second,
+    third:  !!offense.third,
+  };
 
   const recentPlays = plays
     .slice(-5)
@@ -195,6 +201,7 @@ function parseGameState(gameData, plays) {
     inning,
     inningState,
     outs,
+    runners,
     recentPlays,
     isAway,
   };
@@ -395,6 +402,43 @@ function renderDashboard() {
 
   const phaseClass = `phase-${state.phase.replace("-", "")}`;
 
+  function diamondHtml(gs) {
+    const r = gs.runners;
+    const inningArrow = gs.inningState === "Top" ? "▲" : gs.inningState === "Bottom" ? "▼" : "";
+    const ordinal = (n) => {
+      if (n === 1) return "1st"; if (n === 2) return "2nd"; if (n === 3) return "3rd";
+      return `${n}th`;
+    };
+    const outDots = [0,1,2].map(i =>
+      `<div class="out-dot${i < gs.outs ? " filled" : ""}"></div>`
+    ).join("");
+    // SVG: 100x100 viewBox, diamond centred at 50,50
+    // 2B=top(50,12), 3B=left(18,50), 1B=right(82,50), home=bottom(50,88)
+    const s = 11; // half-size of each base square
+    const b1 = r.first  ? "base-on" : "base-off";
+    const b2 = r.second ? "base-on" : "base-off";
+    const b3 = r.third  ? "base-on" : "base-off";
+    return `
+      <div class="diamond-wrap">
+        <svg class="diamond-svg" width="84" height="84" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- base lines -->
+          <polyline points="50,88 82,50 50,12 18,50 50,88" stroke="#2e4a6a" stroke-width="1.5" fill="none"/>
+          <!-- 2B top -->
+          <rect class="base ${b2}" x="${50-s/2}" y="${12-s/2}" width="${s}" height="${s}" transform="rotate(45 50 12)"/>
+          <!-- 3B left -->
+          <rect class="base ${b3}" x="${18-s/2}" y="${50-s/2}" width="${s}" height="${s}" transform="rotate(45 18 50)"/>
+          <!-- 1B right -->
+          <rect class="base ${b1}" x="${82-s/2}" y="${50-s/2}" width="${s}" height="${s}" transform="rotate(45 82 50)"/>
+          <!-- home plate -->
+          <polygon class="home-plate" points="50,81 56,87 56,95 44,95 44,87"/>
+        </svg>
+        <div class="diamond-meta">
+          <div class="diamond-inning">${inningArrow} ${ordinal(gs.inning)}</div>
+          <div class="diamond-outs">${outDots}</div>
+        </div>
+      </div>`;
+  }
+
   const scoreHtml = gs
     ? `<div class="score-board">
         <div class="team">
@@ -407,7 +451,8 @@ function renderDashboard() {
           <div class="score">${gs.opponentScore}</div>
         </div>
       </div>
-      <div class="inning">${escapeHtml(gs.inningState)} ${gs.inning} | ${gs.outs} out(s)</div>`
+      <div class="inning">${escapeHtml(gs.inningState)} ${gs.inning} | ${gs.outs} out(s)</div>
+      ${state.phase === "live" ? diamondHtml(gs) : ""}`
     : `<div class="empty-msg">${state.phase === "no-game" ? "No game today" : "Waiting for game data..."}</div>`;
 
   const pendingHtml = state.pendingPost
@@ -586,6 +631,46 @@ function renderDashboard() {
       padding: 7px 0; border-bottom: 1px solid #1a2640;
     }
     .sentiment-item:last-child { border-bottom: none; }
+
+    /* Baseball diamond */
+    .diamond-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid #1a2640;
+    }
+    .diamond-svg .base { transition: fill 0.3s; }
+    .base-on  { fill: #e8a020; }
+    .base-off { fill: #1e2e44; stroke: #2e4a6a; stroke-width: 1.5; }
+    .home-plate { fill: #1e2e44; stroke: #2e4a6a; stroke-width: 1.5; }
+    .diamond-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .diamond-inning {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      letter-spacing: 1px;
+      color: #e0e6f0;
+      line-height: 1;
+    }
+    .diamond-outs {
+      display: flex;
+      gap: 5px;
+    }
+    .out-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: #1e2e44;
+      border: 1.5px solid #2e4a6a;
+      transition: background 0.3s;
+    }
+    .out-dot.filled { background: #cc4444; border-color: #cc4444; }
   </style>
 </head>
 <body>
