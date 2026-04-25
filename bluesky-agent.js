@@ -335,7 +335,8 @@ function renderDashboard() {
   const pendingHtml = state.pendingPost
     ? `<div class="pending-post">
         <div class="pending-label">PENDING POST</div>
-        <div class="post-text">${escapeHtml(state.pendingPost.text)}</div>
+        <textarea id="post-edit" class="post-edit" maxlength="300" oninput="updateCharCount(this)">${escapeHtml(state.pendingPost.text)}</textarea>
+        <div class="char-count"><span id="char-count">${state.pendingPost.text.length}</span> / 300</div>
         <div class="post-actions">
           <button class="btn-approve" onclick="approvePost()">Approve + Post</button>
           <button class="btn-reject" onclick="rejectPost()">Reject</button>
@@ -451,6 +452,16 @@ function renderDashboard() {
     .pending-label { font-size: 10px; color: #5588bb; letter-spacing: 1.5px; margin-bottom: 10px; }
     .post-text { font-size: 15px; line-height: 1.6; color: #ddeeff; margin-bottom: 14px; }
     .post-actions { display: flex; gap: 10px; }
+    .post-edit {
+      width: 100%; background: #071220; color: #ddeeff; border: 1px solid #2a4a6a;
+      border-radius: 6px; padding: 12px; font-size: 15px; font-family: 'Inter', sans-serif;
+      line-height: 1.6; resize: vertical; min-height: 80px; margin-bottom: 6px;
+      outline: none;
+    }
+    .post-edit:focus { border-color: #4488bb; }
+    .char-count { font-size: 11px; color: #445; text-align: right; margin-bottom: 10px; }
+    .char-count.over { color: #dd5555; }
+
     .btn-approve {
       background: #14401e; color: #66dd88; border: 1px solid #226633;
       padding: 8px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;
@@ -531,8 +542,22 @@ function renderDashboard() {
       }
     }
 
+    function updateCharCount(el) {
+      const counter = document.getElementById("char-count");
+      if (!counter) return;
+      counter.textContent = el.value.length;
+      counter.parentElement.classList.toggle("over", el.value.length > 300);
+    }
+
     async function approvePost() {
-      await apiFetch("/api/approve", { method: "POST" });
+      const textarea = document.getElementById("post-edit");
+      const text = textarea ? textarea.value.trim() : null;
+      if (text !== null && text.length === 0) return;
+      await apiFetch("/api/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
       location.reload();
     }
 
@@ -597,24 +622,34 @@ function serveDashboard() {
         res.end(JSON.stringify({ error: "No pending post" }));
         return;
       }
-      const post = state.pendingPost;
-      state.pendingPost = null;
+      let body = "";
+      req.on("data", (chunk) => (body += chunk));
+      req.on("end", () => {
+        const post = state.pendingPost;
+        state.pendingPost = null;
 
-      postToBluesky(post.text)
-        .then(() => {
-          state.recentPosts.unshift({ text: post.text, postedAt: new Date().toISOString() });
-          if (state.recentPosts.length > 5) state.recentPosts.pop();
-          state.postCount++;
-          console.log(`Posted (${state.postCount}/${MAX_POSTS}): "${post.text}"`);
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ ok: true }));
-        })
-        .catch((err) => {
-          console.error("Post failed:", err.message);
-          state.pendingPost = post;
-          res.writeHead(500, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: err.message }));
-        });
+        let text = post.text;
+        try {
+          const parsed = JSON.parse(body);
+          if (parsed.text && typeof parsed.text === "string") text = parsed.text.trim();
+        } catch {}
+
+        postToBluesky(text)
+          .then(() => {
+            state.recentPosts.unshift({ text, postedAt: new Date().toISOString() });
+            if (state.recentPosts.length > 5) state.recentPosts.pop();
+            state.postCount++;
+            console.log(`Posted (${state.postCount}/${MAX_POSTS}): "${text}"`);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: true }));
+          })
+          .catch((err) => {
+            console.error("Post failed:", err.message);
+            state.pendingPost = post;
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: err.message }));
+          });
+      });
       return;
     }
 
