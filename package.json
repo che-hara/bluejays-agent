@@ -2,11 +2,11 @@
   "name": "bluesky-bluejays-agent",
   "version": "2.0.0",
   "description": "AI agent that posts live Blue Jays game updates to Bluesky (ESPN API version)",
-  "main": "bluesky-agent-espn.js",
+  "main": "bluesky-agent.js",
   "type": "module",
   "scripts": {
-    "start": "node bluesky-agent-espn.js",
-    "dev": "NODE_ENV=development node bluesky-agent-espn.js",
+    "start": "node bluesky-agent.js",
+    "dev": "NODE_ENV=development node bluesky-agent.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
