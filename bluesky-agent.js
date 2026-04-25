@@ -613,7 +613,8 @@ function checkDashboardAuth(req) {
 
 function serveDashboard() {
   const server = http.createServer((req, res) => {
-    const { pathname, method } = new URL(req.url, `http://localhost:${PORT}`);
+    const { pathname } = new URL(req.url, `http://localhost:${PORT}`);
+    const method = req.method;
 
     if (pathname === "/" || pathname === "") {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
