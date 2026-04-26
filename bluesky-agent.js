@@ -358,7 +358,7 @@ function findKeyPlay(plays, fromIndex, isAway) {
 // CLAUDE AI POST GENERATION
 // ============================================================================
 
-async function generateFanReactionPost(gameState, momentum, fanSentiment, keyPlay = null) {
+async function generateFanReactionPost(gameState, momentum, fanSentiment, keyPlay = null, vibe = "") {
   const diff = momentum.differential;
   const situation =
     diff > 0 ? `up by ${diff}` : diff < 0 ? `down by ${Math.abs(diff)}` : "tied";
@@ -385,7 +385,7 @@ ${gameState.recentPlays
   .slice(0, 3)
   .map((p) => `- ${p}`)
   .join("\n")}
-${
+${vibe ? `\nGAME VIBE (use this to set the tone and emotional colour of your post):\n${vibe}` : ""}${
   fanSentiment.length > 0
     ? `\nFAN VIBES:\n${fanSentiment
         .slice(0, 2)
@@ -1020,7 +1020,7 @@ async function poll() {
         ? `Inning ${gs.inning} check-in`
         : momentum.momentum;
       console.log(`${reason} — generating post...`);
-      const text = await generateFanReactionPost(gs, momentum, state.fanSentiment, keyPlay);
+      const text = await generateFanReactionPost(gs, momentum, state.fanSentiment, keyPlay, state.vibe);
       if (text) {
         state.pendingPost = { text, generatedAt: new Date().toISOString() };
         console.log(`Queued for approval: "${text}"`);
