@@ -131,6 +131,34 @@ async function postToBluesky(text) {
   return await res.json();
 }
 
+const BLUESKY_HANDLE = "likeablechelsey.com";
+
+async function fetchMyPosts() {
+  if (!blueskySession) return [];
+  try {
+    const res = await fetch(
+      `https://bsky.social/xrpc/app.bsky.feed.getAuthorFeed?actor=${BLUESKY_HANDLE}&limit=8&filter=posts_no_replies`,
+      { headers: { Authorization: `Bearer ${blueskySession.accessJwt}` } }
+    );
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      if (res.status === 401 || body.includes("ExpiredToken")) await blueskyRefreshSession();
+      return [];
+    }
+    const data = await res.json();
+    return (data.feed || [])
+      .map((item) => ({
+        text: item.post?.record?.text || "",
+        postedAt: item.post?.record?.createdAt || item.post?.indexedAt || new Date().toISOString(),
+        uri: item.post?.uri || "",
+      }))
+      .filter((p) => p.text.length > 0)
+      .slice(0, 5);
+  } catch {
+    return [];
+  }
+}
+
 async function fetchFanSentiment() {
   if (!blueskySession) return [];
   try {
@@ -499,13 +527,21 @@ function renderDashboard() {
   const recentHtml =
     state.recentPosts.length > 0
       ? state.recentPosts
-          .map(
-            (p) =>
-              `<div class="recent-post">
-                <span class="recent-text">${escapeHtml(p.text)}</span>
-                <span class="post-time">${new Date(p.postedAt).toLocaleTimeString()}</span>
-              </div>`
-          )
+          .map((p) => {
+            const bskyUrl = p.uri
+              ? (() => {
+                  // at://did:plc:xxx/app.bsky.feed.post/rkey → profile/handle/post/rkey
+                  const parts = p.uri.replace("at://", "").split("/");
+                  const rkey = parts[2];
+                  return `https://bsky.app/profile/${BLUESKY_HANDLE}/post/${rkey}`;
+                })()
+              : null;
+            const time = new Date(p.postedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            return `<div class="recent-post">
+              <span class="recent-text">${escapeHtml(p.text)}</span>
+              <span class="post-time">${bskyUrl ? `<a href="${bskyUrl}" target="_blank" rel="noopener" style="color:#5588bb;text-decoration:none;">${time} ↗</a>` : time}</span>
+            </div>`;
+          })
           .join("")
       : `<div class="empty-msg">No posts yet this game</div>`;
 
@@ -955,9 +991,13 @@ async function poll() {
     const joiningMidGame = firstLivePoll && (gs.blueJaysScore + gs.opponentScore > 0);
     if (firstLivePoll) {
       firstLivePoll = false;
-      state.fanSentiment = await fetchFanSentiment();
+      [state.fanSentiment, state.recentPosts] = await Promise.all([
+        fetchFanSentiment(),
+        fetchMyPosts(),
+      ]);
     } else if (Math.random() < 0.3) {
       state.fanSentiment = await fetchFanSentiment();
+      state.recentPosts = await fetchMyPosts();
     }
 
     const momentum = analyzeMomentum(gs);
