@@ -61,6 +61,26 @@ async function blueskyLogin() {
   console.log("Logged into Bluesky as", blueskySession.handle || BLUESKY_USERNAME);
 }
 
+async function blueskyRefreshSession() {
+  if (!blueskySession?.refreshJwt) {
+    await blueskyLogin();
+    return;
+  }
+  try {
+    const res = await fetch("https://bsky.social/xrpc/com.atproto.server.refreshSession", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${blueskySession.refreshJwt}` },
+    });
+    if (!res.ok) throw new Error("refresh failed");
+    const data = await res.json();
+    blueskySession = { ...blueskySession, ...data };
+    console.log("Refreshed Bluesky session token");
+  } catch {
+    console.log("Token refresh failed — re-logging in");
+    await blueskyLogin();
+  }
+}
+
 function detectHashtagsAndCreateFacets(text) {
   const facets = [];
   const encoder = new TextEncoder();
@@ -99,12 +119,15 @@ async function postToBluesky(text) {
     body: JSON.stringify({ repo: blueskySession.did, collection: "app.bsky.feed.post", record }),
   });
 
-  if (res.status === 401) {
-    await blueskyLogin();
-    return postToBluesky(text);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    const isExpired = res.status === 401 || body.includes("ExpiredToken");
+    if (isExpired) {
+      await blueskyRefreshSession();
+      return postToBluesky(text);
+    }
+    throw new Error(`Failed to post: ${body}`);
   }
-
-  if (!res.ok) throw new Error(`Failed to post: ${await res.text()}`);
   return await res.json();
 }
 
@@ -115,7 +138,13 @@ async function fetchFanSentiment() {
       "https://bsky.social/xrpc/app.bsky.feed.searchPosts?q=Blue+Jays&limit=15&sort=latest",
       { headers: { Authorization: `Bearer ${blueskySession.accessJwt}` } }
     );
-    if (!res.ok) return [];
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      if (res.status === 401 || body.includes("ExpiredToken")) {
+        await blueskyRefreshSession();
+      }
+      return [];
+    }
     const data = await res.json();
     return (data.posts || [])
       .map((p) => p.record?.text || "")
