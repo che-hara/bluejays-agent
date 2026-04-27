@@ -600,7 +600,7 @@ function renderDashboard() {
 
     @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
 
-    .last-updated { margin-left: auto; font-size: 11px; color: #446; }
+    .last-updated { margin-left: auto; font-size: 11px; color: #fff; }
 
     main {
       max-width: 920px;
