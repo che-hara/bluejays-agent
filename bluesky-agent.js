@@ -394,7 +394,7 @@ ${vibe ? `\nGAME VIBE (use this to set the tone and emotional colour of your pos
     : ""
 }
 
-Write a single Bluesky post. 1-2 sentences, under 150 characters. Use city names not team nicknames. Occasional emoji okay. No hashtags.${isCheckIn ? " Sound like you just opened the game and are catching up." : ""}
+Write a single Bluesky post. 1-2 sentences, under 260 characters (you need room for #BlueJays). Use city names not team nicknames. Use emojis freely — lean on 💙🤍⚾️🧢 especially. Always end with #BlueJays.${isCheckIn ? " Sound like you just opened the game and are catching up." : ""}
 
 Reply with ONLY the post text.`;
 
